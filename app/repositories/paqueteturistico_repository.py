@@ -1,0 +1,383 @@
+from typing import Optional, List
+from app.database import db
+from app.models.paqueteturistico import PaqueteTuristicoResponse, PaqueteTuristicoCreate, PaqueteTuristicoUpdate, PaqueteTuristicoFiltros
+from fastapi import HTTPException, status
+import logging
+import json
+from datetime import date, datetime
+
+logger = logging.getLogger(__name__)
+
+class PaqueteTuristicoRepository(object):
+    def __init__(self):
+        self.connection = db.get_client()
+    
+    async def create_paquete_turistico(self, paquete_data: PaqueteTuristicoCreate) -> PaqueteTuristicoResponse:
+        """Crea un nuevo paquete turístico"""
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute("""
+                INSERT INTO paquetes_turisticos (
+                    operador_id, titulo, descripcion, tipo_paquete, 
+                    duracion_dias, capacidad_maxima, precio_por_persona, precio_grupal,
+                    incluye_transporte, incluye_alojamiento, incluye_comidas, incluye_guia,
+                    pais_origen, ciudad_origen, destinos, itinerario, actividades_incluidas,
+                    requisitos_especiales, dificultad, edad_minima, edad_maxima,
+                    fecha_creacion, fecha_actualizacion
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 
+                CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            """, (
+                paquete_data.operador_id, paquete_data.titulo, 
+                paquete_data.descripcion, paquete_data.tipo_paquete,
+                paquete_data.duracion_dias, paquete_data.capacidad_maxima, 
+                float(paquete_data.precio_por_persona), 
+                float(paquete_data.precio_grupal) if paquete_data.precio_grupal else None,
+                paquete_data.incluye_transporte, paquete_data.incluye_alojamiento,
+                paquete_data.incluye_comidas, paquete_data.incluye_guia,
+                paquete_data.pais_origen, paquete_data.ciudad_origen, paquete_data.destinos,
+                paquete_data.itinerario, paquete_data.actividades_incluidas,
+                paquete_data.requisitos_especiales, paquete_data.dificultad,
+                paquete_data.edad_minima, paquete_data.edad_maxima
+            ))
+            
+            self.connection.commit()
+            
+            # Obtener el paquete creado
+            paquete_id = cursor.lastrowid
+            cursor.execute(
+                "SELECT * FROM paquetes_turisticos WHERE id = ?",
+                (paquete_id,)
+            )
+            paquete_data = dict(cursor.fetchone())
+            
+            return await self._enrich_paquete_response(paquete_data)
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error al crear paquete turístico: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Error interno del servidor"
+            )
+    
+    async def get_paquete_by_id(self, paquete_id: int, user_id: Optional[int] = None) -> Optional[PaqueteTuristicoResponse]:
+        """Obtiene un paquete turístico por ID"""
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute(
+                "SELECT * FROM paquetes_turisticos WHERE id = ?",
+                (paquete_id,)
+            )
+            paquete = cursor.fetchone()
+            
+            if not paquete:
+                return None
+            
+            return await self._enrich_paquete_response(
+                dict(paquete), user_id
+            )
+        except Exception as e:
+            logger.error(f"Error al obtener paquete por ID: {e}")
+            return None
+    
+    async def get_all_paquetes(self, skip: int = 0, limit: int = 100, user_id: Optional[int] = None) -> List[PaqueteTuristicoResponse]:
+        """Obtiene todos los paquetes turísticos activos"""
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute("""
+                SELECT * FROM paquetes_turisticos WHERE esta_activo = 1
+                ORDER BY fecha_creacion DESC
+                LIMIT ? OFFSET ?
+            """, (limit, skip))
+            
+            paquetes = []
+            for paquete in cursor.fetchall():
+                enriched_paquete = await self._enrich_paquete_response(
+                    dict(paquete), user_id
+                )
+                paquetes.append(enriched_paquete)
+            
+            return paquetes
+        except Exception as e:
+            logger.error(f"Error al obtener paquetes: {e}")
+            return []
+    
+    async def get_paquetes_by_operador(self, operador_id: int, skip: int = 0, limit: int = 100) -> List[PaqueteTuristicoResponse]:
+        """Obtiene los paquetes de un operador turístico"""
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute("""
+                SELECT * FROM paquetes_turisticos WHERE operador_id = ?
+                ORDER BY fecha_creacion DESC
+                LIMIT ? OFFSET ?
+            """, (operador_id, limit, skip))
+            
+            paquetes = []
+            for paquete in cursor.fetchall():
+                enriched_paquete = await self._enrich_paquete_response(
+                    dict(paquete)
+                )
+                paquetes.append(enriched_paquete)
+            
+            return paquetes
+        except Exception as e:
+            logger.error(f"Error al obtener paquetes del operador: {e}")
+            return []
+    
+    async def update_paquete(self, paquete_id: int, paquete_update: PaqueteTuristicoUpdate) -> Optional[PaqueteTuristicoResponse]:
+        """Actualiza un paquete turístico"""
+        try:
+            # Filtrar campos None
+            update_data = {k: v for k, v in paquete_update.dict().items() if v is not None}
+            
+            if not update_data:
+                return await self.get_paquete_by_id(paquete_id)
+            
+            # Convertir Decimal a float para campos de precio
+            if 'precio_por_persona' in update_data:
+                update_data['precio_por_persona'] = float(update_data['precio_por_persona'])
+            if 'precio_grupal' in update_data:
+                update_data['precio_grupal'] = float(update_data['precio_grupal'])
+            
+            # Construir query de actualización
+            set_clause = ", ".join([f"{k} = ?" for k in update_data.keys()])
+            values = list(update_data.values()) + [paquete_id]
+            
+            cursor = self.connection.cursor()
+            cursor.execute(
+                f"UPDATE paquetes_turisticos SET {set_clause}, "
+                f"fecha_actualizacion = CURRENT_TIMESTAMP WHERE id = ?",
+                values
+            )
+            
+            if cursor.rowcount == 0:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Paquete turístico no encontrado"
+                )
+            
+            self.connection.commit()
+            return await self.get_paquete_by_id(paquete_id)
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error al actualizar paquete turístico: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Error interno del servidor"
+            )
+    
+    async def delete_paquete(self, paquete_id: int) -> bool:
+        """Elimina un paquete turístico (marca como inactivo)"""
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute(
+                "UPDATE paquetes_turisticos SET esta_activo = 0 WHERE id = ?",
+                (paquete_id,)
+            )
+            self.connection.commit()
+            
+            return cursor.rowcount > 0
+        except Exception as e:
+            logger.error(f"Error al eliminar paquete turístico: {e}")
+            return False
+    
+    async def search_paquetes(self, filtros: PaqueteTuristicoFiltros, skip: int = 0, limit: int = 100, user_id: Optional[int] = None) -> List[PaqueteTuristicoResponse]:
+        """Busca paquetes turísticos según filtros"""
+        try:
+            # Construir query dinámicamente
+            query = "SELECT * FROM paquetes_turisticos WHERE esta_activo = 1"
+            params = []
+            
+            if filtros.pais_origen:
+                query += " AND pais_origen LIKE ?"
+                params.append(f"%{filtros.pais_origen}%")
+            
+            if filtros.ciudad_origen:
+                query += " AND ciudad_origen LIKE ?"
+                params.append(f"%{filtros.ciudad_origen}%")
+            
+            if filtros.destinos:
+                query += " AND destinos LIKE ?"
+                params.append(f"%{filtros.destinos}%")
+            
+            if filtros.tipo_paquete:
+                query += " AND tipo_paquete = ?"
+                params.append(filtros.tipo_paquete)
+            
+            if filtros.duracion_min:
+                query += " AND duracion_dias >= ?"
+                params.append(filtros.duracion_min)
+            
+            if filtros.duracion_max:
+                query += " AND duracion_dias <= ?"
+                params.append(filtros.duracion_max)
+            
+            if filtros.capacidad_minima:
+                query += " AND capacidad_maxima >= ?"
+                params.append(filtros.capacidad_minima)
+            
+            if filtros.precio_min:
+                query += " AND precio_por_persona >= ?"
+                params.append(float(filtros.precio_min))
+            
+            if filtros.precio_max:
+                query += " AND precio_por_persona <= ?"
+                params.append(float(filtros.precio_max))
+            
+            if filtros.incluye_transporte is not None:
+                query += " AND incluye_transporte = ?"
+                params.append(filtros.incluye_transporte)
+            
+            if filtros.incluye_alojamiento is not None:
+                query += " AND incluye_alojamiento = ?"
+                params.append(filtros.incluye_alojamiento)
+            
+            if filtros.incluye_comidas is not None:
+                query += " AND incluye_comidas = ?"
+                params.append(filtros.incluye_comidas)
+            
+            if filtros.incluye_guia is not None:
+                query += " AND incluye_guia = ?"
+                params.append(filtros.incluye_guia)
+            
+            if filtros.dificultad:
+                query += " AND dificultad = ?"
+                params.append(filtros.dificultad)
+            
+            if filtros.edad_minima:
+                query += " AND (edad_minima IS NULL OR edad_minima <= ?)"
+                params.append(filtros.edad_minima)
+            
+            if filtros.edad_maxima:
+                query += " AND (edad_maxima IS NULL OR edad_maxima >= ?)"
+                params.append(filtros.edad_maxima)
+            
+            query += " ORDER BY fecha_creacion DESC LIMIT ? OFFSET ?"
+            params.extend([limit, skip])
+            
+            cursor = self.connection.cursor()
+            cursor.execute(query, params)
+            
+            paquetes = []
+            for paquete in cursor.fetchall():
+                enriched_paquete = await self._enrich_paquete_response(
+                    dict(paquete), user_id
+                )
+                paquetes.append(enriched_paquete)
+            
+            return paquetes
+        except Exception as e:
+            logger.error(f"Error al buscar paquetes turísticos: {e}")
+            return []
+    
+    async def _enrich_paquete_response(self, paquete_data: dict, user_id: Optional[int] = None) -> PaqueteTuristicoResponse:
+        """Enriquece la respuesta de paquete turístico con datos adicionales"""
+        try:
+            # Obtener datos del operador turístico
+            cursor = self.connection.cursor()
+            cursor.execute(
+                "SELECT nombre, apellido, avatar_url FROM usuarios WHERE id = ?",
+                (paquete_data['operador_id'],)
+            )
+            operador = cursor.fetchone()
+            
+            if operador:
+                operador_dict = dict(operador)
+                paquete_data['operador_nombre'] = operador_dict['nombre']
+                paquete_data['operador_apellido'] = operador_dict['apellido']
+                paquete_data['operador_avatar'] = operador_dict['avatar_url']
+            
+            # Obtener calificación promedio y total de reviews
+            # Nota: Necesitaremos actualizar las reviews para que trabajen con paquetes
+            cursor.execute("""
+                SELECT AVG(calificacion) as promedio, COUNT(*) as total
+                FROM reviews WHERE paquete_id = ?
+            """, (paquete_data['id'],))
+            
+            review_stats = cursor.fetchone()
+            if review_stats:
+                review_dict = dict(review_stats)
+                paquete_data['calificacion_promedio'] = (
+                    float(review_dict['promedio']) if review_dict['promedio'] else None
+                )
+                paquete_data['total_reviews'] = review_dict['total']
+            
+            # Obtener imágenes del paquete
+            cursor.execute(
+                "SELECT url_imagen FROM imagenes_paquetes WHERE paquete_id = ? "
+                "ORDER BY orden, es_principal DESC",
+                (paquete_data['id'],)
+            )
+            
+            imagenes_result = cursor.fetchall()
+            imagenes = [dict(row)['url_imagen'] for row in imagenes_result]
+            paquete_data['imagenes'] = imagenes
+            
+            # Verificar si es favorito del usuario
+            if user_id:
+                cursor.execute(
+                    "SELECT id FROM favoritos_paquetes WHERE usuario_id = ? AND paquete_id = ?",
+                    (user_id, paquete_data['id'])
+                )
+                favorito = cursor.fetchone()
+                paquete_data['es_favorito'] = favorito is not None
+            
+            # Obtener próximas fechas disponibles
+            cursor.execute("""
+                SELECT fecha_inicio FROM fechas_disponibles_paquetes 
+                WHERE paquete_id = ? AND fecha_inicio >= date('now') AND cupos_disponibles > 0
+                ORDER BY fecha_inicio LIMIT 5
+            """, (paquete_data['id'],))
+            
+            fechas_result = cursor.fetchall()
+            fechas_disponibles = []
+            for fecha_row in fechas_result:
+                fecha_str = dict(fecha_row)['fecha_inicio']
+                try:
+                    fecha_obj = datetime.strptime(fecha_str, '%Y-%m-%d').date()
+                    fechas_disponibles.append(fecha_obj)
+                except:
+                    pass
+            paquete_data['proximas_fechas'] = fechas_disponibles
+            
+            return PaqueteTuristicoResponse(**paquete_data)
+        except Exception as e:
+            logger.error(f"Error al enriquecer respuesta de paquete turístico: {e}")
+            return PaqueteTuristicoResponse(**paquete_data)
+    
+    # Métodos para compatibilidad con código existente
+    async def create_propiedad(self, propiedad_data) -> PaqueteTuristicoResponse:
+        """Método de compatibilidad - redirige a create_paquete_turistico"""
+        return await self.create_paquete_turistico(propiedad_data)
+    
+    async def get_propiedad_by_id(self, propiedad_id: int, user_id: Optional[int] = None) -> Optional[PaqueteTuristicoResponse]:
+        """Método de compatibilidad - redirige a get_paquete_turistico_by_id"""
+        return await self.get_paquete_turistico_by_id(propiedad_id, user_id)
+    
+    async def get_all_propiedades(self, skip: int = 0, limit: int = 100, user_id: Optional[int] = None) -> List[PaqueteTuristicoResponse]:
+        """Método de compatibilidad - redirige a get_all_paquetes_turisticos"""
+        return await self.get_all_paquetes_turisticos(skip, limit, user_id)
+    
+    async def get_propiedades_by_anfitrion(self, anfitrion_id: int, skip: int = 0, limit: int = 100) -> List[PaqueteTuristicoResponse]:
+        """Método de compatibilidad - redirige a get_paquetes_turisticos_by_operador"""
+        return await self.get_paquetes_turisticos_by_operador(anfitrion_id, skip, limit)
+    
+    async def update_propiedad(self, propiedad_id: int, propiedad_update) -> Optional[PaqueteTuristicoResponse]:
+        """Método de compatibilidad - redirige a update_paquete_turistico"""
+        return await self.update_paquete_turistico(propiedad_id, propiedad_update)
+    
+    async def delete_propiedad(self, propiedad_id: int) -> bool:
+        """Método de compatibilidad - redirige a delete_paquete_turistico"""
+        return await self.delete_paquete_turistico(propiedad_id)
+    
+    async def search_propiedades(self, filtros, skip: int = 0, limit: int = 100, user_id: Optional[int] = None) -> List[PaqueteTuristicoResponse]:
+        """Método de compatibilidad - redirige a search_paquetes_turisticos"""
+        return await self.search_paquetes_turisticos(filtros, skip, limit, user_id)
+
+# Instancia global del repository de paquetes turísticos
+paquete_turistico_repository = PaqueteTuristicoRepository()
+
+# Alias para compatibilidad con código existente
+propiedad_repository = paquete_turistico_repository
+PropiedadRepository = PaqueteTuristicoRepository 
