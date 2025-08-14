@@ -23,39 +23,22 @@ class PaqueteTuristicoRepository(object):
             logger.info(f"Imágenes recibidas: {paquete_data.imagenes}")
             cursor = self.connection.cursor()
             cursor.execute("""
-                INSERT INTO paquetes_turisticos (
-                    operador_id, titulo, descripcion, tipo_paquete, 
-                    duracion_dias, capacidad_maxima, nivel_dificultad, precio_por_persona, precio_niño,
-                    incluye_transporte, incluye_alojamiento, incluye_comidas, incluye_guia,
-                    pais_destino, ciudad_destino, punto_encuentro, latitud, longitud,
-                    hora_inicio, hora_fin, edad_minima, requiere_experiencia, permite_cancelacion,
-                    fecha_creacion, fecha_actualizacion
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-            """, (
-                paquete_data.operador_id,
-                paquete_data.titulo,
-                paquete_data.descripcion,
-                paquete_data.tipo_paquete,
-                paquete_data.duracion_dias,
-                paquete_data.capacidad_maxima,
-                paquete_data.nivel_dificultad,
-                float(paquete_data.precio_por_persona),
-                float(paquete_data.precio_niño),
-                paquete_data.incluye_transporte,
-                paquete_data.incluye_alojamiento,
-                paquete_data.incluye_comidas,
-                paquete_data.incluye_guia,
-                paquete_data.pais_destino,
-                paquete_data.ciudad_destino,
-                paquete_data.punto_encuentro,
-                float(paquete_data.latitud) if paquete_data.latitud is not None else None,
-                float(paquete_data.longitud) if paquete_data.longitud is not None else None,
-                paquete_data.hora_inicio,
-                paquete_data.hora_fin,
-                paquete_data.edad_minima,
-                paquete_data.requiere_experiencia,
-                paquete_data.permite_cancelacion
-            ))
+    INSERT INTO paquetes_turisticos (
+        operador_id, titulo, tipo_paquete, duracion_dias, capacidad_maxima, nivel_dificultad,
+        precio_por_persona, pais_destino, ciudad_destino, punto_encuentro
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+""", (
+    paquete_data.operador_id,
+    paquete_data.titulo,
+    paquete_data.tipo_paquete,
+    paquete_data.duracion_dias,
+    paquete_data.capacidad_maxima,
+    paquete_data.nivel_dificultad,
+    float(paquete_data.precio_por_persona),
+    paquete_data.pais_destino,
+    paquete_data.ciudad_destino,
+    paquete_data.punto_encuentro
+))
             self.connection.commit()
 
             # Obtener el paquete creado
