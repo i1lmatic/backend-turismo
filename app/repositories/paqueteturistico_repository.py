@@ -15,6 +15,12 @@ class PaqueteTuristicoRepository(object):
     async def create_paquete_turistico(self, paquete_data: PaqueteTuristicoCreate) -> PaqueteTuristicoResponse:
         """Crea un nuevo paquete turístico"""
         try:
+            # Validar campos obligatorios y loguear datos recibidos
+            logger.info(f"Datos recibidos para crear paquete: {paquete_data}")
+            if not paquete_data.titulo or not paquete_data.tipo_paquete or not paquete_data.duracion_dias or not paquete_data.capacidad_maxima or not paquete_data.nivel_dificultad or not paquete_data.precio_por_persona or not paquete_data.pais_destino or not paquete_data.ciudad_destino or not paquete_data.punto_encuentro:
+                logger.error("Faltan campos obligatorios para crear el paquete turístico")
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Faltan campos obligatorios para crear el paquete turístico")
+            logger.info(f"Imágenes recibidas: {paquete_data.imagenes}")
             cursor = self.connection.cursor()
             cursor.execute("""
                 INSERT INTO paquetes_turisticos (
@@ -62,10 +68,13 @@ class PaqueteTuristicoRepository(object):
 
             # Guardar imágenes en la tabla imagenes_paquetes
             if paquete_data.imagenes:
-                for img_base64 in paquete_data.imagenes:
+                for idx, img_base64 in enumerate(paquete_data.imagenes):
                     cursor.execute(
-                        "INSERT INTO imagenes_paquetes (paquete_id, url_imagen) VALUES (?, ?)",
-                        (paquete_id, img_base64)
+                        """
+                        INSERT INTO imagenes_paquetes (paquete_id, url_imagen, es_principal, orden)
+                        VALUES (?, ?, ?, ?)
+                        """,
+                        (paquete_id, img_base64, 1 if idx == 0 else 0, idx)
                     )
                 self.connection.commit()
 

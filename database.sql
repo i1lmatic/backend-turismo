@@ -26,7 +26,7 @@ CREATE TABLE usuarios (
   respuesta_tiempo_horas INTEGER
 );
 
--- Tabla de paquetes turísticos
+-- Tabla de paquetes turísticosm
 CREATE TABLE paquetes_turisticos (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   operador_id INTEGER NOT NULL,
