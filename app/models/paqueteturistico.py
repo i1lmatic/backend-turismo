@@ -34,6 +34,7 @@ class PaqueteTuristicoBase(BaseModel):
 
 class PaqueteTuristicoCreate(PaqueteTuristicoBase):
     operador_id: int  # Cambio de anfitrion_id a operador_id
+    imagenes: Optional[List[str]] = None  # Lista de imágenes en base64
 
 class PaqueteTuristicoUpdate(BaseModel):
     titulo: Optional[str] = Field(None, min_length=1, max_length=200)

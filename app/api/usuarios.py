@@ -7,7 +7,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/usuarios", tags=["Usuarios - Sistema de Turismo"])
+router = APIRouter(tags=["Usuarios - Sistema de Turismo"])
 
 @router.get("/me", response_model=UsuarioResponse)
 async def get_me(current_user: UsuarioResponse = Depends(auth_handler.get_current_user)):

@@ -19,38 +19,57 @@ class PaqueteTuristicoRepository(object):
             cursor.execute("""
                 INSERT INTO paquetes_turisticos (
                     operador_id, titulo, descripcion, tipo_paquete, 
-                    duracion_dias, capacidad_maxima, precio_por_persona, precio_grupal,
+                    duracion_dias, capacidad_maxima, nivel_dificultad, precio_por_persona, precio_niño,
                     incluye_transporte, incluye_alojamiento, incluye_comidas, incluye_guia,
-                    pais_origen, ciudad_origen, destinos, itinerario, actividades_incluidas,
-                    requisitos_especiales, dificultad, edad_minima, edad_maxima,
+                    pais_destino, ciudad_destino, punto_encuentro, latitud, longitud,
+                    hora_inicio, hora_fin, edad_minima, requiere_experiencia, permite_cancelacion,
                     fecha_creacion, fecha_actualizacion
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 
-                CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
             """, (
-                paquete_data.operador_id, paquete_data.titulo, 
-                paquete_data.descripcion, paquete_data.tipo_paquete,
-                paquete_data.duracion_dias, paquete_data.capacidad_maxima, 
-                float(paquete_data.precio_por_persona), 
-                float(paquete_data.precio_grupal) if paquete_data.precio_grupal else None,
-                paquete_data.incluye_transporte, paquete_data.incluye_alojamiento,
-                paquete_data.incluye_comidas, paquete_data.incluye_guia,
-                paquete_data.pais_origen, paquete_data.ciudad_origen, paquete_data.destinos,
-                paquete_data.itinerario, paquete_data.actividades_incluidas,
-                paquete_data.requisitos_especiales, paquete_data.dificultad,
-                paquete_data.edad_minima, paquete_data.edad_maxima
+                paquete_data.operador_id,
+                paquete_data.titulo,
+                paquete_data.descripcion,
+                paquete_data.tipo_paquete,
+                paquete_data.duracion_dias,
+                paquete_data.capacidad_maxima,
+                paquete_data.nivel_dificultad,
+                float(paquete_data.precio_por_persona),
+                float(paquete_data.precio_niño),
+                paquete_data.incluye_transporte,
+                paquete_data.incluye_alojamiento,
+                paquete_data.incluye_comidas,
+                paquete_data.incluye_guia,
+                paquete_data.pais_destino,
+                paquete_data.ciudad_destino,
+                paquete_data.punto_encuentro,
+                float(paquete_data.latitud) if paquete_data.latitud is not None else None,
+                float(paquete_data.longitud) if paquete_data.longitud is not None else None,
+                paquete_data.hora_inicio,
+                paquete_data.hora_fin,
+                paquete_data.edad_minima,
+                paquete_data.requiere_experiencia,
+                paquete_data.permite_cancelacion
             ))
-            
             self.connection.commit()
-            
+
             # Obtener el paquete creado
             paquete_id = cursor.lastrowid
             cursor.execute(
                 "SELECT * FROM paquetes_turisticos WHERE id = ?",
                 (paquete_id,)
             )
-            paquete_data = dict(cursor.fetchone())
-            
-            return await self._enrich_paquete_response(paquete_data)
+            paquete_row = dict(cursor.fetchone())
+
+            # Guardar imágenes en la tabla imagenes_paquetes
+            if paquete_data.imagenes:
+                for img_base64 in paquete_data.imagenes:
+                    cursor.execute(
+                        "INSERT INTO imagenes_paquetes (paquete_id, url_imagen) VALUES (?, ?)",
+                        (paquete_id, img_base64)
+                    )
+                self.connection.commit()
+
+            return await self._enrich_paquete_response(paquete_row)
         except HTTPException:
             raise
         except Exception as e:
