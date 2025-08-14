@@ -5,6 +5,11 @@ from fastapi import HTTPException, status
 import logging
 import json
 from datetime import date, datetime
+from fastapi import APIRouter, Depends, HTTPException
+from models import PaqueteTuristicoUpdate
+from typing import Optional
+
+router = APIRouter()
 
 logger = logging.getLogger(__name__)
 
@@ -135,6 +140,7 @@ class PaqueteTuristicoRepository(object):
             logger.error(f"Error al obtener paquetes del operador: {e}")
             return []
     
+
     async def update_paquete(self, paquete_id: int, paquete_update: PaqueteTuristicoUpdate) -> Optional[PaqueteTuristicoResponse]:
         """Actualiza un paquete turístico"""
         try:
