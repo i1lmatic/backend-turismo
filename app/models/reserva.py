@@ -5,7 +5,7 @@ from decimal import Decimal
 
 class ReservaBase(BaseModel):
     paquete_id: int
-    turista_id: int
+    turista_id: Optional[int] = None
     fecha_inicio: date
     fecha_fin: date
     numero_personas: int = Field(..., gt=0, le=50)

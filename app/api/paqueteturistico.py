@@ -47,7 +47,7 @@ async def get_paquetes_turisticos(
     """Obtiene todos los paquetes turísticos activos"""
     try:
         user_id = str(current_user.id) if current_user else None
-        paquetes = await paquete_turistico_repository.get_all_paquetes_turisticos(skip, limit, user_id)
+        paquetes = await paquete_turistico_repository.get_all_paquetes(skip, limit, user_id)
         return paquetes
     except Exception as e:
         logger.error(f"Error al obtener paquetes turísticos: {e}")
@@ -92,20 +92,20 @@ async def update_paquete_turistico(
     try:
         # Verificar que el paquete pertenezca al usuario actual
         paquete = await paquete_turistico_repository.get_paquete_turistico_by_id(paquete_id)
-        
+
         if not paquete:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Paquete turístico no encontrado"
             )
-        
+
         if str(paquete.operador_id) != str(current_user.id):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="No tienes permisos para actualizar este paquete turístico"
             )
-        
-        updated_paquete = await paquete_turistico_repository.update_paquete_turistico(paquete_id, paquete_update)
+
+        updated_paquete = await paquete_turistico_repository.update_paquete(paquete_id, paquete_update)
         return updated_paquete
     except HTTPException:
         raise
@@ -125,27 +125,26 @@ async def delete_paquete_turistico(
     try:
         # Verificar que el paquete pertenezca al usuario actual
         paquete = await paquete_turistico_repository.get_paquete_turistico_by_id(paquete_id)
-        
+
         if not paquete:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Paquete turístico no encontrado"
             )
-        
+
         if str(paquete.operador_id) != str(current_user.id):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="No tienes permisos para eliminar este paquete turístico"
             )
-        
-        success = await paquete_turistico_repository.delete_paquete_turistico(paquete_id)
-        
+
+        success = await paquete_turistico_repository.delete_paquete(paquete_id)
         if not success:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Error al eliminar el paquete turístico"
             )
-        
+
         return {"message": "Paquete turístico eliminado exitosamente"}
     except HTTPException:
         raise

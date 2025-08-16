@@ -37,9 +37,9 @@ async def get_my_favoritos(
     limit: int = Query(100, ge=1, le=1000),
     current_user: UsuarioResponse = Depends(auth_handler.get_current_user)
 ):
-    """Obtiene los paquetes turísticos favoritos del usuario actual"""
+    """Obtiene los paquetes turísticos favoritos del usuario autenticado"""
     try:
-        favoritos = await favorito_repository.get_favoritos_by_user(str(current_user.id), skip, limit)
+        favoritos = await favorito_repository.get_favoritos_by_user(current_user.id, skip, limit)
         return favoritos
     except Exception as e:
         logger.error(f"Error al obtener paquetes favoritos: {e}")
@@ -47,6 +47,21 @@ async def get_my_favoritos(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error interno del servidor"
         )
+
+
+@router.get("/check/{paquete_id}")
+async def check_favorito(
+    paquete_id: str,
+    current_user: UsuarioResponse = Depends(auth_handler.get_current_user)
+):
+    """Verifica si un paquete turístico está en favoritos del usuario"""
+    try:
+        is_favorite = await favorito_repository.is_favorite(paquete_id, str(current_user.id))
+        return {"is_favorite": is_favorite}
+    except Exception as e:
+        logger.error(f"Error al verificar favorito: {e}")
+        # Nunca devolver 404, siempre devolver is_favorite: false
+        return {"is_favorite": False}
 
 @router.delete("/{paquete_id}")
 async def remove_favorito(
@@ -72,19 +87,3 @@ async def remove_favorito(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error interno del servidor"
         )
-
-@router.get("/check/{paquete_id}")
-async def check_favorito(
-    paquete_id: str,
-    current_user: UsuarioResponse = Depends(auth_handler.get_current_user)
-):
-    """Verifica si un paquete turístico está en favoritos del usuario"""
-    try:
-        is_favorite = await favorito_repository.is_favorite(paquete_id, str(current_user.id))
-        return {"is_favorite": is_favorite}
-    except Exception as e:
-        logger.error(f"Error al verificar favorito: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error interno del servidor"
-        ) 

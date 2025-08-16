@@ -6,7 +6,6 @@ import logging
 import json
 from datetime import date, datetime
 from fastapi import APIRouter, Depends, HTTPException
-from models import PaqueteTuristicoUpdate
 from typing import Optional
 
 router = APIRouter()
@@ -123,23 +122,24 @@ class PaqueteTuristicoRepository(object):
         try:
             cursor = self.connection.cursor()
             cursor.execute("""
-                SELECT * FROM paquetes_turisticos WHERE operador_id = ?
+                SELECT * FROM paquetes_turisticos WHERE operador_id = ? AND esta_activo = 1
                 ORDER BY fecha_creacion DESC
                 LIMIT ? OFFSET ?
             """, (operador_id, limit, skip))
-            
             paquetes = []
             for paquete in cursor.fetchall():
                 enriched_paquete = await self._enrich_paquete_response(
                     dict(paquete)
                 )
                 paquetes.append(enriched_paquete)
-            
             return paquetes
         except Exception as e:
             logger.error(f"Error al obtener paquetes del operador: {e}")
             return []
     
+    async def get_paquete_turistico_by_id(self, paquete_id: int, user_id: Optional[int] = None) -> Optional[PaqueteTuristicoResponse]:
+        """Alias para obtener paquete turístico por ID"""
+        return await self.get_paquete_by_id(paquete_id, user_id)
 
     async def update_paquete(self, paquete_id: int, paquete_update: PaqueteTuristicoUpdate) -> Optional[PaqueteTuristicoResponse]:
         """Actualiza un paquete turístico"""
@@ -334,29 +334,13 @@ class PaqueteTuristicoRepository(object):
             # Verificar si es favorito del usuario
             if user_id:
                 cursor.execute(
-                    "SELECT id FROM favoritos_paquetes WHERE usuario_id = ? AND paquete_id = ?",
+                    "SELECT id FROM favoritos WHERE usuario_id = ? AND paquete_id = ?",
                     (user_id, paquete_data['id'])
                 )
                 favorito = cursor.fetchone()
                 paquete_data['es_favorito'] = favorito is not None
             
-            # Obtener próximas fechas disponibles
-            cursor.execute("""
-                SELECT fecha_inicio FROM fechas_disponibles_paquetes 
-                WHERE paquete_id = ? AND fecha_inicio >= date('now') AND cupos_disponibles > 0
-                ORDER BY fecha_inicio LIMIT 5
-            """, (paquete_data['id'],))
-            
-            fechas_result = cursor.fetchall()
-            fechas_disponibles = []
-            for fecha_row in fechas_result:
-                fecha_str = dict(fecha_row)['fecha_inicio']
-                try:
-                    fecha_obj = datetime.strptime(fecha_str, '%Y-%m-%d').date()
-                    fechas_disponibles.append(fecha_obj)
-                except:
-                    pass
-            paquete_data['proximas_fechas'] = fechas_disponibles
+
             
             return PaqueteTuristicoResponse(**paquete_data)
         except Exception as e:
@@ -391,6 +375,9 @@ class PaqueteTuristicoRepository(object):
     async def search_propiedades(self, filtros, skip: int = 0, limit: int = 100, user_id: Optional[int] = None) -> List[PaqueteTuristicoResponse]:
         """Método de compatibilidad - redirige a search_paquetes_turisticos"""
         return await self.search_paquetes_turisticos(filtros, skip, limit, user_id)
+
+        # Alias para compatibilidad con el API
+        get_all_paquetes_turisticos = get_all_paquetes
 
 # Instancia global del repository de paquetes turísticos
 paquete_turistico_repository = PaqueteTuristicoRepository()

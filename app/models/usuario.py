@@ -63,7 +63,7 @@ class UsuarioResponse(BaseModel):
     ciudad: Optional[str] = None
     direccion: Optional[str] = None
     codigo_postal: Optional[str] = None
-    es_operador: bool
+    es_operador: bool 
     es_verificado: bool
     avatar_url: Optional[str] = None
     descripcion_perfil: Optional[str] = None

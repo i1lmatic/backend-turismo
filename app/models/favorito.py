@@ -3,7 +3,6 @@ from datetime import datetime
 from typing import Optional
 
 class FavoritoBase(BaseModel):
-    usuario_id: int
     paquete_id: int
 
 class FavoritoCreate(FavoritoBase):

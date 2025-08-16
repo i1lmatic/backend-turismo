@@ -10,26 +10,39 @@ class FavoritoRepository(object):
     def __init__(self):
         self.connection = db.get_client()
     
-    async def add_favorito(self, favorito_data: FavoritoCreate) -> FavoritoResponse:
+    async def add_favorito(self, favorito_data: FavoritoCreate) -> Optional[FavoritoResponse]:
         """Agrega un paquete turístico a favoritos"""
         try:
             cursor = self.connection.cursor()
+            # Evitar duplicados
+            cursor.execute(
+                "SELECT 1 FROM favoritos WHERE usuario_id = ? AND paquete_id = ?",
+                (favorito_data.usuario_id, favorito_data.paquete_id)
+            )
+            if cursor.fetchone():
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="El paquete ya está en favoritos"
+                )
             cursor.execute("""
                 INSERT INTO favoritos (usuario_id, paquete_id, fecha_agregado)
                 VALUES (?, ?, CURRENT_TIMESTAMP)
             """, (favorito_data.usuario_id, favorito_data.paquete_id))
-            
             self.connection.commit()
-            
             # Obtener el favorito creado
             favorito_id = cursor.lastrowid
             cursor.execute(
                 "SELECT * FROM favoritos WHERE id = ?",
                 (favorito_id,)
             )
-            favorito_data = dict(cursor.fetchone())
-            
-            return await self._enrich_favorito_response(favorito_data)
+            row = cursor.fetchone()
+            if row is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Favorito no encontrado tras inserción"
+                )
+            favorito_data_dict = dict(row)
+            return self._enrich_favorito_response(favorito_data_dict)
         except HTTPException:
             raise
         except Exception as e:
@@ -48,12 +61,11 @@ class FavoritoRepository(object):
                 ORDER BY fecha_agregado DESC
                 LIMIT ? OFFSET ?
             """, (user_id, limit, skip))
-            
             favoritos = []
             for favorito in cursor.fetchall():
-                enriched_favorito = await self._enrich_favorito_response(dict(favorito))
+                favorito_dict = dict(favorito)
+                enriched_favorito = self._enrich_favorito_response(favorito_dict)
                 favoritos.append(enriched_favorito)
-            
             return favoritos
         except Exception as e:
             logger.error(f"Error al obtener favoritos del usuario: {e}")
@@ -88,7 +100,7 @@ class FavoritoRepository(object):
             logger.error(f"Error al verificar favorito: {e}")
             return False
     
-    def _enrich_favorito_response(self, favorito_data: dict) -> FavoritoResponse:
+    def _enrich_favorito_response(self, favorito_data: dict) -> Optional[FavoritoResponse]:
         """Enriquece la respuesta de favorito con datos adicionales"""
         try:
             # Obtener datos del paquete turístico
@@ -98,48 +110,42 @@ class FavoritoRepository(object):
                 (favorito_data['paquete_id'],)
             )
             paquete = cursor.fetchone()
-            
-            if paquete:
-                paquete_dict = dict(paquete)
-                favorito_data['paquete_titulo'] = paquete_dict['titulo']
-                favorito_data['paquete_precio_por_persona'] = paquete_dict['precio_por_persona']
-                favorito_data['paquete_destino'] = paquete_dict['destino']
-                favorito_data['paquete_tipo'] = paquete_dict['tipo_paquete']
-                favorito_data['paquete_duracion_dias'] = paquete_dict['duracion_dias']
-                favorito_data['paquete_nivel_dificultad'] = paquete_dict['nivel_dificultad']
-                
-                # Obtener imagen principal del paquete turístico
-                cursor.execute(
-                    "SELECT url_imagen FROM imagenes_paquetes WHERE paquete_id = ? AND es_principal = 1 LIMIT 1",
-                    (favorito_data['paquete_id'],)
-                )
-                imagen = cursor.fetchone()
-                if imagen:
-                    favorito_data['paquete_imagen_principal'] = imagen['url_imagen']
-                
-                # Calcular calificación promedio del paquete turístico
-                cursor.execute("""
-                    SELECT AVG(calificacion) as promedio
-                    FROM reviews WHERE paquete_id = ?
-                """, (favorito_data['paquete_id'],))
-                
-                review_stats = cursor.fetchone()
-                if review_stats:
-                    stats_dict = dict(review_stats)
-                    favorito_data['paquete_calificacion_promedio'] = float(stats_dict['promedio']) if stats_dict['promedio'] else None
-                
-                # Obtener datos del operador
-                cursor.execute(
-                    "SELECT nombre, apellido FROM usuarios WHERE id = ?",
-                    (paquete_dict['operador_id'],)
-                )
-                operador = cursor.fetchone()
-                
-                if operador:
-                    operador_dict = dict(operador)
-                    favorito_data['operador_nombre'] = operador_dict['nombre']
-                    favorito_data['operador_apellido'] = operador_dict['apellido']
-            
+            if not paquete:
+                return None
+            paquete_dict = dict(paquete)
+            favorito_data['paquete_titulo'] = paquete_dict['titulo']
+            favorito_data['paquete_precio_por_persona'] = paquete_dict['precio_por_persona']
+            favorito_data['paquete_destino'] = paquete_dict['destino']
+            favorito_data['paquete_tipo'] = paquete_dict['tipo_paquete']
+            favorito_data['paquete_duracion_dias'] = paquete_dict['duracion_dias']
+            favorito_data['paquete_nivel_dificultad'] = paquete_dict['nivel_dificultad']
+            # Obtener imagen principal del paquete turístico
+            cursor.execute(
+                "SELECT url_imagen FROM imagenes_paquetes WHERE paquete_id = ? AND es_principal = 1 LIMIT 1",
+                (favorito_data['paquete_id'],)
+            )
+            imagen = cursor.fetchone()
+            if imagen:
+                favorito_data['paquete_imagen_principal'] = imagen['url_imagen']
+            # Calcular calificación promedio del paquete turístico
+            cursor.execute("""
+                SELECT AVG(calificacion) as promedio
+                FROM reviews WHERE paquete_id = ?
+            """, (favorito_data['paquete_id'],))
+            review_stats = cursor.fetchone()
+            if review_stats:
+                stats_dict = dict(review_stats)
+                favorito_data['paquete_calificacion_promedio'] = float(stats_dict['promedio']) if stats_dict['promedio'] else None
+            # Obtener datos del operador
+            cursor.execute(
+                "SELECT nombre, apellido FROM usuarios WHERE id = ?",
+                (paquete_dict['operador_id'],)
+            )
+            operador = cursor.fetchone()
+            if operador:
+                operador_dict = dict(operador)
+                favorito_data['operador_nombre'] = operador_dict['nombre']
+                favorito_data['operador_apellido'] = operador_dict['apellido']
             return FavoritoResponse(**favorito_data)
         except Exception as e:
             logger.error(f"Error al enriquecer respuesta de favorito: {e}")

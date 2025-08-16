@@ -8,14 +8,12 @@ import os
 from app.config import settings
 from app.database import db
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import (
-    auth_router,
-    usuarios_router,
-    paquetes_turisticos_router,
-    reservas_router,
-    reviews_router,
-    favoritos_router
-)
+from app.api.auth import router as auth_router
+from app.api.usuarios import router as usuarios_router
+from app.api.paqueteturistico import router as paquetes_turisticos_router
+from app.api.reservas import router as reservas_router
+from app.api.reviews import router as reviews_router
+from app.api.favoritos import router as favoritos_router
 from app.postman_generator import router as postman_router
 
 # Configurar logging
@@ -125,7 +123,7 @@ async def root():
 app.include_router(auth_router)
 app.include_router(usuarios_router, prefix="/usuarios")
 app.include_router(paquetes_turisticos_router)
-app.include_router(reservas_router, prefix="/reservas")
+app.include_router(reservas_router)
 app.include_router(reviews_router, prefix="/reviews")
 app.include_router(favoritos_router, prefix="/favoritos")
 app.include_router(postman_router)
