@@ -1,3 +1,4 @@
+
 from pydantic_settings import BaseSettings
 from typing import List
 import os
@@ -5,7 +6,11 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
+
+
 class Settings(BaseSettings):
+    vite_backend_url: str = "http://26.59.235.147:8000"
     # Configuración de la base de datos SQLite
     database_path: str = os.getenv("DATABASE_PATH", "database.sqlite")
     
