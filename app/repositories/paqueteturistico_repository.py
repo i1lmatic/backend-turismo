@@ -288,6 +288,53 @@ class PaqueteTuristicoRepository(object):
             logger.error(f"Error al buscar paquetes turísticos: {e}")
             return []
     
+    async def search_paquetes_turisticos(self, filtros: PaqueteTuristicoFiltros, skip: int = 0, limit: int = 100, user_id: Optional[int] = None) -> List[PaqueteTuristicoResponse]:
+        """Busca paquetes turísticos según filtros avanzados"""
+        try:
+            cursor = self.connection.cursor()
+            query = "SELECT * FROM paquetes_turisticos WHERE 1=1"
+            params = []
+
+            if filtros.tipo_paquete:
+                query += " AND tipo_paquete = ?"
+                params.append(filtros.tipo_paquete)
+            if filtros.pais_destino:
+                query += " AND pais_destino = ?"
+                params.append(filtros.pais_destino)
+            if filtros.ciudad_destino:
+                query += " AND ciudad_destino = ?"
+                params.append(filtros.ciudad_destino)
+            if filtros.nivel_dificultad:
+                query += " AND nivel_dificultad = ?"
+                params.append(filtros.nivel_dificultad)
+            if filtros.precio_min is not None:
+                query += " AND precio_por_persona >= ?"
+                params.append(float(filtros.precio_min))
+            if filtros.precio_max is not None:
+                query += " AND precio_por_persona <= ?"
+                params.append(float(filtros.precio_max))
+            if filtros.duracion_min is not None:
+                query += " AND duracion_dias >= ?"
+                params.append(filtros.duracion_min)
+            if filtros.duracion_max is not None:
+                query += " AND duracion_dias <= ?"
+                params.append(filtros.duracion_max)
+
+            query += " LIMIT ? OFFSET ?"
+            params.extend([limit, skip])
+
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
+            paquetes = []
+            for row in rows:
+                paquete_row = dict(row)
+                paquete = await self._enrich_paquete_response(paquete_row)
+                paquetes.append(paquete)
+            return paquetes
+        except Exception as e:
+            logger.error(f"Error en búsqueda de paquetes turísticos: {e}")
+            raise HTTPException(status_code=500, detail="Error interno en búsqueda de paquetes turísticos")
+    
     async def _enrich_paquete_response(self, paquete_data: dict, user_id: Optional[int] = None) -> PaqueteTuristicoResponse:
         """Enriquece la respuesta de paquete turístico con datos adicionales"""
         try:
@@ -384,4 +431,4 @@ paquete_turistico_repository = PaqueteTuristicoRepository()
 
 # Alias para compatibilidad con código existente
 propiedad_repository = paquete_turistico_repository
-PropiedadRepository = PaqueteTuristicoRepository 
+PropiedadRepository = PaqueteTuristicoRepository
