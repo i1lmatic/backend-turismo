@@ -3,7 +3,7 @@ from typing import Optional
 from datetime import datetime
 
 class ReviewBase(BaseModel):
-    reserva_id: int
+    reserva_id: Optional[int] = None
     autor_id: Optional[int] = None
     paquete_id: int
     calificacion: int = Field(..., ge=1, le=5)

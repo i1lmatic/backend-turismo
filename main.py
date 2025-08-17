@@ -124,7 +124,7 @@ app.include_router(auth_router)
 app.include_router(usuarios_router, prefix="/usuarios")
 app.include_router(paquetes_turisticos_router)
 app.include_router(reservas_router)
-app.include_router(reviews_router, prefix="/reviews")
+app.include_router(reviews_router)
 app.include_router(favoritos_router, prefix="/favoritos")
 app.include_router(postman_router)
 
