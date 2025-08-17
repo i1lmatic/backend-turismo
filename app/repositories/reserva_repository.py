@@ -185,8 +185,18 @@ INSERT INTO reservas (
             cursor = self.connection.cursor()
             cursor.execute(
                 """
-                SELECT r.* FROM reservas r
+                SELECT
+                    r.*, -- todos los campos de reservas
+                    p.titulo AS paquete_titulo,
+                    
+                    u.nombre AS operador_nombre,
+                    u.apellido AS operador_apellido,
+                    tu.nombre AS turista_nombre,
+                    tu.apellido AS turista_apellido
+                FROM reservas r
                 JOIN paquetes_turisticos p ON r.paquete_id = p.id
+                JOIN usuarios u ON p.operador_id = u.id
+                JOIN usuarios tu ON r.turista_id = tu.id
                 WHERE p.operador_id = ?
                 ORDER BY r.fecha_creacion DESC
                 LIMIT ? OFFSET ?
@@ -194,53 +204,16 @@ INSERT INTO reservas (
             )
             reservas = []
             for reserva in cursor.fetchall():
-                enriched_reserva = self._enrich_reserva_response(dict(reserva))
-                reservas.append(enriched_reserva)
+                reservas.append(self._enrich_reserva_response(dict(reserva)))
             return reservas
         except Exception as e:
             logger.error(f"Error al obtener reservas del operador: {e}")
             return []
     
     def _enrich_reserva_response(self, reserva_data: dict) -> ReservaResponse:
-        """Enriquece la respuesta de reserva con datos adicionales"""
-        try:
-            # Obtener datos de la propiedad
-            cursor = self.connection.cursor()
-            cursor.execute(
-                "SELECT titulo FROM paquetes_turisticos WHERE id = ?",
-                (reserva_data['paquete_id'],)
-            )
-            propiedad = cursor.fetchone()
-            
-            if propiedad:
-                propiedad_dict = dict(propiedad)
-                reserva_data['propiedad_titulo'] = propiedad_dict['titulo']
-            
-            # Obtener datos del anfitrión
-            if propiedad:
-                cursor.execute(
-                    "SELECT nombre, apellido FROM usuarios WHERE id = ?",
-                    (propiedad_dict['operador_id'],)
-                )
-                operador = cursor.fetchone()
-                
-                if operador:
-                    operador_dict = dict(operador)
-                    reserva_data['operador_nombre'] = operador_dict['nombre']
-                    reserva_data['operador_apellido'] = operador_dict['apellido']
-            
-            # (Lógica de huésped eliminada)
-            
-            # Calcular días de estancia
-            check_in = datetime.fromisoformat(reserva_data['fecha_inicio'].replace('Z', '+00:00'))
-            check_out = datetime.fromisoformat(reserva_data['fecha_fin'].replace('Z', '+00:00'))
-            dias = (check_out - check_in).days
-            reserva_data['dias_estancia'] = dias
-            
-            return ReservaResponse(**reserva_data)
-        except Exception as e:
-            logger.error(f"Error al enriquecer respuesta de reserva: {e}")
-            return ReservaResponse(**reserva_data)
+        """Retorna la reserva sin enriquecimiento adicional"""
+        return ReservaResponse(**reserva_data)
+
 
 # Instancia global del repository de reservas
 reserva_repository = ReservaRepository()

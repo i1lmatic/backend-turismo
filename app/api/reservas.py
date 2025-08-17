@@ -1,3 +1,4 @@
+
 from fastapi import APIRouter, HTTPException, status, Depends, Query
 from typing import List, Optional
 from app.models.reserva import ReservaResponse, ReservaCreate, ReservaUpdate, ReservaFiltros
@@ -9,6 +10,17 @@ import logging
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/reservas", tags=["Reservas"])
+
+@router.get("/operador", response_model=List[ReservaResponse])
+async def get_reservas_by_operador(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=1000),
+    current_user: UsuarioResponse = Depends(auth_handler.get_current_user)
+):
+    if not current_user.es_operador:
+        raise HTTPException(status_code=403, detail="Solo operadores pueden ver sus reservas")
+    reservas = await reserva_repository.get_reservas_by_operador(str(current_user.id), skip, limit)
+    return reservas  # No lances error si reservas es []
 
 @router.post("/", response_model=ReservaResponse, status_code=status.HTTP_201_CREATED)
 async def create_reserva(
@@ -126,14 +138,3 @@ async def cancel_reserva(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error interno del servidor"
         )
-
-@router.get("/operador", response_model=List[ReservaResponse])
-async def get_reservas_by_operador(
-    skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=1000),
-    current_user: UsuarioResponse = Depends(auth_handler.get_current_user)
-):
-    if not current_user.es_operador:
-        raise HTTPException(status_code=403, detail="Solo operadores pueden ver sus reservas")
-    reservas = await reserva_repository.get_reservas_by_operador(str(current_user.id), skip, limit)
-    return reservas  # No lances error si reservas es []
