@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from typing import Optional, Union
-from jose import JWTError, jwt
+from jose import JWTError,jwt
 from passlib.context import CryptContext
 from app.config import settings
 from app.models.usuario import TokenData
@@ -56,7 +56,7 @@ class JWTHandler(object):
     def verify_token(self, token: str) -> Optional[TokenData]:
         """Verifica y decodifica un token JWT del sistema de turismo"""
         try:
-            payload = jwt.decode(token, self.secret_key, algorithms=[self.algorithm])
+            payload = jwt.decode(token, self.secret_key, algorithms=["HS256"])
             user_id: str = payload.get("sub")
             email: str = payload.get("email")
             
@@ -81,7 +81,7 @@ class JWTHandler(object):
     def extract_user_info_from_token(self, token: str) -> Optional[dict]:
         """Extrae información completa del usuario desde el token"""
         try:
-            payload = jwt.decode(token, self.secret_key, algorithms=[self.algorithm])
+            payload = jwt.decode(token, self.secret_key, algorithms=["HS256"])
             return {
                 "user_id": payload.get("sub"),
                 "email": payload.get("email"),
