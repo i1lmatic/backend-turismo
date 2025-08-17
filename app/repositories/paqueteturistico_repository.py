@@ -394,34 +394,6 @@ class PaqueteTuristicoRepository(object):
             logger.error(f"Error al enriquecer respuesta de paquete turístico: {e}")
             return PaqueteTuristicoResponse(**paquete_data)
     
-    # Métodos para compatibilidad con código existente
-    async def create_propiedad(self, propiedad_data) -> PaqueteTuristicoResponse:
-        """Método de compatibilidad - redirige a create_paquete_turistico"""
-        return await self.create_paquete_turistico(propiedad_data)
-    
-    async def get_propiedad_by_id(self, propiedad_id: int, user_id: Optional[int] = None) -> Optional[PaqueteTuristicoResponse]:
-        """Método de compatibilidad - redirige a get_paquete_turistico_by_id"""
-        return await self.get_paquete_turistico_by_id(propiedad_id, user_id)
-    
-    async def get_all_propiedades(self, skip: int = 0, limit: int = 100, user_id: Optional[int] = None) -> List[PaqueteTuristicoResponse]:
-        """Método de compatibilidad - redirige a get_all_paquetes_turisticos"""
-        return await self.get_all_paquetes_turisticos(skip, limit, user_id)
-    
-    async def get_propiedades_by_anfitrion(self, anfitrion_id: int, skip: int = 0, limit: int = 100) -> List[PaqueteTuristicoResponse]:
-        """Método de compatibilidad - redirige a get_paquetes_turisticos_by_operador"""
-        return await self.get_paquetes_turisticos_by_operador(anfitrion_id, skip, limit)
-    
-    async def update_propiedad(self, propiedad_id: int, propiedad_update) -> Optional[PaqueteTuristicoResponse]:
-        """Método de compatibilidad - redirige a update_paquete_turistico"""
-        return await self.update_paquete_turistico(propiedad_id, propiedad_update)
-    
-    async def delete_propiedad(self, propiedad_id: int) -> bool:
-        """Método de compatibilidad - redirige a delete_paquete_turistico"""
-        return await self.delete_paquete_turistico(propiedad_id)
-    
-    async def search_propiedades(self, filtros, skip: int = 0, limit: int = 100, user_id: Optional[int] = None) -> List[PaqueteTuristicoResponse]:
-        """Método de compatibilidad - redirige a search_paquetes_turisticos"""
-        return await self.search_paquetes_turisticos(filtros, skip, limit, user_id)
 
         # Alias para compatibilidad con el API
         get_all_paquetes_turisticos = get_all_paquetes

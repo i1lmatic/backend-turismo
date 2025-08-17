@@ -179,6 +179,28 @@ INSERT INTO reservas (
             logger.error(f"Error al cancelar reserva: {e}")
             return False
     
+    async def get_reservas_by_operador(self, operador_id: str, skip: int = 0, limit: int = 100) -> list[ReservaResponse]:
+        """Obtiene las reservas asociadas a los paquetes de un operador"""
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute(
+                """
+                SELECT r.* FROM reservas r
+                JOIN paquetes_turisticos p ON r.paquete_id = p.id
+                WHERE p.operador_id = ?
+                ORDER BY r.fecha_creacion DESC
+                LIMIT ? OFFSET ?
+                """, (operador_id, limit, skip)
+            )
+            reservas = []
+            for reserva in cursor.fetchall():
+                enriched_reserva = self._enrich_reserva_response(dict(reserva))
+                reservas.append(enriched_reserva)
+            return reservas
+        except Exception as e:
+            logger.error(f"Error al obtener reservas del operador: {e}")
+            return []
+    
     def _enrich_reserva_response(self, reserva_data: dict) -> ReservaResponse:
         """Enriquece la respuesta de reserva con datos adicionales"""
         try:
@@ -221,4 +243,4 @@ INSERT INTO reservas (
             return ReservaResponse(**reserva_data)
 
 # Instancia global del repository de reservas
-reserva_repository = ReservaRepository() 
+reserva_repository = ReservaRepository()
