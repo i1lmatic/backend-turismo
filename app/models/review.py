@@ -4,10 +4,10 @@ from datetime import datetime
 
 class ReviewBase(BaseModel):
     reserva_id: int
-    autor_id: int
+    autor_id: Optional[int] = None
     paquete_id: int
     calificacion: int = Field(..., ge=1, le=5)
-    comentario: Optional[str] = None
+    comentario: str = Field(..., min_length=1)
     # Categorías específicas para paquetes turísticos (coinciden con base de datos)
     organizacion: Optional[int] = Field(None, ge=1, le=5)
     comunicacion: Optional[int] = Field(None, ge=1, le=5)
@@ -17,7 +17,7 @@ class ReviewBase(BaseModel):
     valor: Optional[int] = Field(None, ge=1, le=5)
 
 class ReviewCreate(ReviewBase):
-    pass
+        autor_id: Optional[int] = None
 
 class ReviewUpdate(BaseModel):
     calificacion: Optional[int] = Field(None, ge=1, le=5)

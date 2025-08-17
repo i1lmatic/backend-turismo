@@ -19,8 +19,7 @@ async def create_review(
     try:
         # Asignar el autor actual
         review_data.autor_id = current_user.id
-        
-        review = await review_repository.create_review(review_data)
+        review = review_repository.create_review(review_data)
         return review
     except HTTPException:
         raise
@@ -39,7 +38,7 @@ async def get_reviews_by_paquete(
 ):
     """Obtiene las reviews de un paquete turístico"""
     try:
-        reviews = await review_repository.get_reviews_by_paquete(paquete_id, skip, limit)
+        reviews = review_repository.get_reviews_by_paquete(paquete_id, skip, limit)
         return reviews
     except Exception as e:
         logger.error(f"Error al obtener reviews: {e}")
@@ -52,14 +51,12 @@ async def get_reviews_by_paquete(
 async def get_review_by_id(review_id: str):
     """Obtiene una review específica"""
     try:
-        review = await review_repository.get_review_by_id(review_id)
-        
+        review = review_repository.get_review_by_id(review_id)
         if not review:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Review no encontrada"
             )
-        
         return review
     except HTTPException:
         raise
