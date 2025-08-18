@@ -7,6 +7,23 @@ import logging
 logger = logging.getLogger(__name__)
 
 class ReviewRepository(object):
+    def get_reviews_by_autor(self, autor_id: int, skip: int = 0, limit: int = 100) -> list[ReviewResponse]:
+        """Obtiene las reviews hechas por un usuario"""
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute("""
+                SELECT * FROM reviews WHERE autor_id = ?
+                ORDER BY fecha_review DESC
+                LIMIT ? OFFSET ?
+            """, (autor_id, limit, skip))
+            reviews = []
+            for review in cursor.fetchall():
+                enriched_review = self._enrich_review_response(dict(review))
+                reviews.append(enriched_review)
+            return reviews
+        except Exception as e:
+            logger.error(f"Error al obtener reviews de usuario: {e}")
+            return []
     def __init__(self):
         self.connection = db.get_client()
     
