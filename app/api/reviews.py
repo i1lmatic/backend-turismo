@@ -9,6 +9,22 @@ import logging
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/reviews", tags=["Reviews"])
+@router.get("/mias", response_model=List[ReviewResponse])
+async def get_my_reviews(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=1000),
+    current_user: UsuarioResponse = Depends(auth_handler.get_current_user)
+):
+    """Obtiene las reviews hechas por el usuario autenticado"""
+    try:
+        reviews = review_repository.get_reviews_by_autor(current_user.id, skip, limit)
+        return reviews
+    except Exception as e:
+        logger.error(f"Error al obtener mis reviews: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error interno del servidor"
+        )
 
 @router.post("/", response_model=ReviewResponse, status_code=status.HTTP_201_CREATED)
 async def create_review(
